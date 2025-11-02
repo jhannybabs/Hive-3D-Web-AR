@@ -1,5 +1,5 @@
 // src/components/ARScene.tsx
-import React, { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import RenderModel from "./RenderModel";
