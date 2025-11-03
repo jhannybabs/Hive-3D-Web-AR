@@ -14,6 +14,8 @@ type Props = {
   scale: number;
   backFacing?: boolean;
   screenSize?: { width: number; height: number };
+  // 🔗 New optional offset from backend
+  offset?: { x: number; y: number };
 };
 
 export default function RenderModel({
@@ -21,6 +23,7 @@ export default function RenderModel({
   attachTo,
   scale,
   backFacing,
+  offset, // ✅ accept offset
 }: Props) {
   const { scene } = useGLTF(modelPath);
   const groupRef = useRef<THREE.Group>(null);
@@ -67,6 +70,12 @@ export default function RenderModel({
 
     const targetPos = camPos.clone().add(dir.multiplyScalar(depth));
     targetPos.x *= -1;
+
+    // ✅ Apply backend offset if provided
+    if (offset) {
+      targetPos.x += offset.x;
+      targetPos.y += offset.y;
+    }
 
     if (smoothPos.current.distanceTo(targetPos) > 0.005) {
       smoothPos.current.lerp(targetPos, 0.2);

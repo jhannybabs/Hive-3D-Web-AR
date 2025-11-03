@@ -11,7 +11,14 @@ type Keypoint = {
   z: number;
   score: number;
 };
-type PoseData = { keypoints: Keypoint[] };
+type PoseData = {
+  keypoints: Keypoint[];
+  average_depth_cm?: number;
+  center_x_m?: number;
+  center_y_m?: number;
+  scale_factor?: number;
+  reference?: string;
+};
 
 const Camera: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -23,6 +30,21 @@ const Camera: React.FC = () => {
   const [selectedGarment, setSelectedGarment] =
     useState<string>("busy_bees_cream");
   const [videoReady, setVideoReady] = useState(false);
+
+  // 🔗 Call FastAPI depth service
+  const sendToDepthAPI = async (pose: PoseData) => {
+    try {
+      const res = await fetch("http://<YOUR_BACKEND_URL>/depth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pose),
+      });
+      return await res.json();
+    } catch (err) {
+      console.error("Depth API error:", err);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const setup = async () => {
@@ -127,8 +149,15 @@ const Camera: React.FC = () => {
         }));
 
         const validKeypoints = keypoints.filter((kp) => kp.score >= 0.5);
-        if (validKeypoints.length >= MIN_VALID_KEYPOINTS)
-          setPoseData({ keypoints });
+        if (validKeypoints.length >= MIN_VALID_KEYPOINTS) {
+          const posePayload = { keypoints };
+          const depthResult = await sendToDepthAPI(posePayload);
+          if (depthResult) {
+            setPoseData({ keypoints, ...depthResult });
+          } else {
+            setPoseData({ keypoints });
+          }
+        }
       }
       if (isMeasuringRef.current) requestAnimationFrame(render);
     };
@@ -174,6 +203,14 @@ const Camera: React.FC = () => {
       <div className="absolute inset-0 z-10 pointer-events-none">
         <ARScene pose={poseData} selectedGarment={selectedGarment} />
       </div>
+
+      {/* 📏 Small div to show user size */}
+      {poseData?.scale_factor && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/80 text-black px-4 py-2 rounded-md shadow-md text-sm z-30">
+          Estimated Size: {poseData.scale_factor.toFixed(2)}x | Depth:{" "}
+          {poseData.average_depth_cm?.toFixed(1)} cm
+        </div>
+      )}
     </div>
   );
 };

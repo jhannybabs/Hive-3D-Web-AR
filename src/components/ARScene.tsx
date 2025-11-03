@@ -12,7 +12,14 @@ type Keypoint = {
   z: number;
   score: number;
 };
-type PoseData = { keypoints: Keypoint[] };
+type PoseData = {
+  keypoints: Keypoint[];
+  average_depth_cm?: number;
+  center_x_m?: number;
+  center_y_m?: number;
+  scale_factor?: number;
+  reference?: string;
+};
 type Props = { pose: PoseData | null; selectedGarment: string };
 
 export default function ARScene({ pose, selectedGarment }: Props) {
@@ -63,10 +70,13 @@ export default function ARScene({ pose, selectedGarment }: Props) {
   const isSmallMobile = dimensions.width <= 480;
 
   const baseScaleFactor = isSmallMobile ? 0.5 : isMobile ? 0.55 : 0.6;
-  const scale = Math.min(
+  const fallbackScale = Math.min(
     Math.max(shoulderWidth / (dimensions.width * baseScaleFactor), 0.25),
     1.5
   );
+
+  // ✅ Use backend scale if available, else fallback
+  const scale = pose?.scale_factor ?? fallbackScale;
 
   const fov = isSmallMobile ? 65 : isMobile ? 60 : 55;
   const cameraZ = isSmallMobile ? 4 : isMobile ? 3.5 : 3;
@@ -100,6 +110,11 @@ export default function ARScene({ pose, selectedGarment }: Props) {
         modelPath={modelPath}
         attachTo={chest}
         scale={scale}
+        // ✅ Pass backend offsets if available
+        offset={{
+          x: pose?.center_x_m ?? 0,
+          y: pose?.center_y_m ?? 0,
+        }}
         screenSize={dimensions}
       />
     </Canvas>
