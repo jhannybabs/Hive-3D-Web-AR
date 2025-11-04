@@ -33,6 +33,7 @@ const Camera: React.FC = () => {
   const [selectedGarment, setSelectedGarment] =
     useState<string>("busy_bees_cream");
   const [videoReady, setVideoReady] = useState(false);
+  const [isEstimating, setIsEstimating] = useState(true);
 
   const sendToDepthAPI = async (pose: PoseData) => {
     try {
@@ -41,7 +42,9 @@ const Camera: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pose),
       });
-      return await res.json();
+      const json = await res.json();
+      console.log("Depth API response:", json);
+      return json;
     } catch (err) {
       console.error("Depth API error:", err);
       return null;
@@ -161,12 +164,19 @@ const Camera: React.FC = () => {
           if (nowMs - lastDepthSentRef.current > 1000) {
             lastDepthSentRef.current = nowMs;
             sendToDepthAPI(posePayload).then((depthResult) => {
-              if (isMountedRef.current) {
-                if (depthResult) {
-                  setPoseData({ keypoints, ...depthResult });
-                } else {
-                  setPoseData({ keypoints });
-                }
+              if (!isMountedRef.current) return;
+
+              const hasDepth =
+                depthResult &&
+                typeof depthResult.scale_factor === "number" &&
+                typeof depthResult.average_depth_cm === "number";
+
+              if (hasDepth) {
+                setPoseData({ keypoints, ...depthResult });
+                setIsEstimating(false);
+              } else {
+                console.warn("Depth result missing fields:", depthResult);
+                setPoseData({ keypoints });
               }
             });
           } else {
@@ -216,11 +226,17 @@ const Camera: React.FC = () => {
         </div>
       )}
 
+      {isEstimating && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white text-black px-5 py-3 rounded-lg shadow-lg text-base font-medium z-30 backdrop-blur-md">
+          Estimating size...
+        </div>
+      )}
+
       <div className="absolute inset-0 z-10 pointer-events-none">
         <ARScene pose={poseData} selectedGarment={selectedGarment} />
       </div>
 
-      {poseData?.scale_factor && (
+      {!isEstimating && poseData?.scale_factor && (
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white text-black px-5 py-3 rounded-lg shadow-lg text-base font-medium z-30 backdrop-blur-md">
           Estimated Size: {poseData.scale_factor.toFixed(2)}x | Depth:{" "}
           {poseData.average_depth_cm?.toFixed(1)} cm
