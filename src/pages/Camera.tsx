@@ -37,11 +37,14 @@ const Camera: React.FC = () => {
 
   const sendToDepthAPI = async (pose: PoseData) => {
     try {
-      const res = await fetch("https://8k973b0d-2702.asse.devtunnels.ms/depth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pose),
-      });
+      const res = await fetch(
+        "https://8k973b0d-2702.asse.devtunnels.ms/depth",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pose),
+        }
+      );
       const json = await res.json();
       console.log("Depth API response:", json);
       return json;
@@ -173,14 +176,16 @@ const Camera: React.FC = () => {
 
               if (hasDepth) {
                 setPoseData({ keypoints, ...depthResult });
-                setIsEstimating(false);
+                if (depthResult.scale_factor && depthResult.average_depth_cm) {
+                  setIsEstimating(false);
+                }
               } else {
                 console.warn("Depth result missing fields:", depthResult);
-                setPoseData({ keypoints });
+                setPoseData((prev) => prev ?? { keypoints });
               }
             });
           } else {
-            setPoseData({ keypoints });
+            setPoseData((prev) => prev ?? { keypoints });
           }
         }
       }
@@ -240,6 +245,13 @@ const Camera: React.FC = () => {
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white text-black px-5 py-3 rounded-lg shadow-lg text-base font-medium z-30 backdrop-blur-md">
           Estimated Size: {poseData.scale_factor.toFixed(2)}x | Depth:{" "}
           {poseData.average_depth_cm?.toFixed(1)} cm
+        </div>
+      )}
+
+      {/* Optional debug overlay */}
+      {poseData && (
+        <div className="absolute bottom-0 left-0 bg-black/70 text-white text-xs p-2 z-40 max-h-[40vh] overflow-y-auto w-full">
+          <pre>{JSON.stringify(poseData, null, 2)}</pre>
         </div>
       )}
     </div>
