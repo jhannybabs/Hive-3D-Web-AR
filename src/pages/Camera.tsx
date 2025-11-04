@@ -182,19 +182,15 @@ const Camera: React.FC = () => {
 
               if (hasDepth) {
                 const enriched = { keypoints, ...depthResult };
-                lastValidDepthRef.current = enriched;
                 setPoseData(enriched);
+                lastValidDepthRef.current = enriched;
                 setIsEstimating(false);
               } else {
-                if (lastValidDepthRef.current) {
-                  setPoseData(lastValidDepthRef.current);
-                }
+                setPoseData(lastValidDepthRef.current ?? { keypoints });
               }
             });
           } else {
-            if (lastValidDepthRef.current) {
-              setPoseData(lastValidDepthRef.current);
-            }
+            setPoseData(lastValidDepthRef.current ?? { keypoints });
           }
         }
       }
