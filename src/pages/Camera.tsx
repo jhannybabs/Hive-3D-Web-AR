@@ -11,6 +11,7 @@ type Keypoint = {
   z: number;
   score: number;
 };
+
 type PoseData = {
   keypoints: Keypoint[];
   average_depth_cm?: number;
@@ -20,16 +21,29 @@ type PoseData = {
   reference?: string;
 };
 
+// 🔧 Map scale factor to shirt sizes
+function mapScaleToSize(scaleFactor: number) {
+  if (scaleFactor < 0.9) return 'S (21.5" x 29")';
+  if (scaleFactor < 1.0) return 'M (22.5" x 30")';
+  if (scaleFactor < 1.1) return 'L (23.5" x 31")';
+  if (scaleFactor < 1.2) return 'XL (24.5" x 32")';
+  if (scaleFactor < 1.3) return '2XL (25.5" x 33")';
+  return '3XL (26.5" x 34")';
+}
+
 const Camera: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const landmarkerRef = useRef<PoseLandmarker | null>(null);
   const isMeasuringRef = useRef<boolean>(true);
+  const lastDepthSentRef = useRef<number>(0);
+  const lastValidDepthRef = useRef<PoseData | null>(null);
 
   const [poseData, setPoseData] = useState<PoseData | null>(null);
   const [selectedGarment, setSelectedGarment] =
     useState<string>("busy_bees_cream");
   const [videoReady, setVideoReady] = useState(false);
+  const [isEstimating, setIsEstimating] = useState(true);
 
   const sendToDepthAPI = async (pose: PoseData) => {
     try {
@@ -41,7 +55,9 @@ const Camera: React.FC = () => {
           body: JSON.stringify(pose),
         }
       );
-      return await res.json();
+      const json = await res.json();
+      console.log("Depth API response:", json);
+      return json;
     } catch (err) {
       console.error("Depth API error:", err);
       return null;
@@ -112,6 +128,7 @@ const Camera: React.FC = () => {
     let lastTimestamp = -1;
     const render = async () => {
       if (!isMeasuringRef.current) return;
+
       if (
         video.readyState < 2 ||
         video.videoWidth === 0 ||
@@ -153,14 +170,31 @@ const Camera: React.FC = () => {
         const validKeypoints = keypoints.filter((kp) => kp.score >= 0.5);
         if (validKeypoints.length >= MIN_VALID_KEYPOINTS) {
           const posePayload = { keypoints };
-          const depthResult = await sendToDepthAPI(posePayload);
-          if (depthResult) {
-            setPoseData({ keypoints, ...depthResult });
+          const nowMs = Date.now();
+
+          if (nowMs - lastDepthSentRef.current > 1000) {
+            lastDepthSentRef.current = nowMs;
+            sendToDepthAPI(posePayload).then((depthResult) => {
+              const hasDepth =
+                depthResult &&
+                typeof depthResult.scale_factor === "number" &&
+                typeof depthResult.average_depth_cm === "number";
+
+              if (hasDepth) {
+                const enriched = { keypoints, ...depthResult };
+                setPoseData(enriched);
+                lastValidDepthRef.current = enriched;
+                setIsEstimating(false);
+              } else {
+                setPoseData(lastValidDepthRef.current ?? { keypoints });
+              }
+            });
           } else {
-            setPoseData({ keypoints });
+            setPoseData(lastValidDepthRef.current ?? { keypoints });
           }
         }
       }
+
       if (isMeasuringRef.current) requestAnimationFrame(render);
     };
     render();
@@ -202,17 +236,31 @@ const Camera: React.FC = () => {
         </div>
       )}
 
+      {isEstimating && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white text-black px-5 py-3 rounded-lg shadow-lg text-base font-medium z-30 backdrop-blur-md">
+          Estimating size...
+        </div>
+      )}
+
+      {/* Garment stays mounted regardless of estimating state */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         <ARScene pose={poseData} selectedGarment={selectedGarment} />
       </div>
 
-      {/* 📏 Small div to show user size */}
-      {poseData?.scale_factor && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/80 text-black px-4 py-2 rounded-md shadow-md text-sm z-30">
-          Estimated Size: {poseData.scale_factor.toFixed(2)}x | Depth:{" "}
+      {/* Size overlay once depth is ready */}
+      {!isEstimating && poseData?.scale_factor && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white text-black px-5 py-3 rounded-lg shadow-lg text-base font-medium z-30 backdrop-blur-md">
+          Estimated Size: {mapScaleToSize(poseData.scale_factor)} | Depth:{" "}
           {poseData.average_depth_cm?.toFixed(1)} cm
         </div>
       )}
+
+      {/* Optional debug overlay for development */}
+      {/* {poseData && (
+        <div className="absolute bottom-0 left-0 bg-black/70 text-white text-xs p-2 z-40 max-h-[40vh] overflow-y-auto w-full">
+          <pre>{JSON.stringify(poseData, null, 2)}</pre>
+        </div>
+      )} */}
     </div>
   );
 };
