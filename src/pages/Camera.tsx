@@ -21,6 +21,16 @@ type PoseData = {
   reference?: string;
 };
 
+// 🔧 Map scale factor to shirt sizes
+function mapScaleToSize(scaleFactor: number) {
+  if (scaleFactor < 0.9) return 'S (21.5" x 29")';
+  if (scaleFactor < 1.0) return 'M (22.5" x 30")';
+  if (scaleFactor < 1.1) return 'L (23.5" x 31")';
+  if (scaleFactor < 1.2) return 'XL (24.5" x 32")';
+  if (scaleFactor < 1.3) return '2XL (25.5" x 33")';
+  return '3XL (26.5" x 34")';
+}
+
 const Camera: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -237,9 +247,14 @@ const Camera: React.FC = () => {
         />
       </div>
 
+      {/* ✅ Sizing overlay */}
       {poseData?.scale_factor && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white text-black px-5 py-3 rounded-lg shadow-lg text-base font-medium z-30 backdrop-blur-md">
-          Estimated Size: {poseData.scale_factor.toFixed(2)}x | Depth:{" "}
+        <div
+          className="absolute bottom-6 left-1/2 transform -translate-x-1/2 
+                     bg-white text-black px-5 py-3 rounded-lg shadow-lg 
+                     text-base font-medium z-30 backdrop-blur-md"
+        >
+          Estimated Size: {mapScaleToSize(poseData.scale_factor)} | Depth:{" "}
           {poseData.average_depth_cm?.toFixed(1)} cm
         </div>
       )}
