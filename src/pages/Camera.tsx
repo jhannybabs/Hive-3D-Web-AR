@@ -31,10 +31,9 @@ const Camera: React.FC = () => {
     useState<string>("busy_bees_cream");
   const [videoReady, setVideoReady] = useState(false);
 
-  // 🔗 Call FastAPI depth service
   const sendToDepthAPI = async (pose: PoseData) => {
     try {
-      const res = await fetch("http://<YOUR_BACKEND_URL>/depth", {
+      const res = await fetch("https://8k973b0d-2702.asse.devtunnels.ms/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pose),
