@@ -47,11 +47,14 @@ const Camera: React.FC = () => {
 
   const sendToDepthAPI = async (pose: PoseData) => {
     try {
-      const res = await fetch("https://8k973b0d-2702.asse.devtunnels.ms/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pose),
-      });
+      const res = await fetch(
+        "https://8k973b0d-2702.asse.devtunnels.ms/depth",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pose),
+        }
+      );
       return await res.json();
     } catch (err) {
       console.error("Depth API error:", err);
