@@ -27,6 +27,7 @@ const Camera: React.FC = () => {
   const landmarkerRef = useRef<PoseLandmarker | null>(null);
   const isMeasuringRef = useRef<boolean>(true);
   const lastDepthSentRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(true);
 
   const [poseData, setPoseData] = useState<PoseData | null>(null);
   const [selectedGarment, setSelectedGarment] =
@@ -48,6 +49,7 @@ const Camera: React.FC = () => {
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     const setup = async () => {
       try {
         const vision = await FilesetResolver.forVisionTasks(
@@ -90,6 +92,7 @@ const Camera: React.FC = () => {
 
     setup();
     return () => {
+      isMountedRef.current = false;
       const video = videoRef.current;
       if (video?.srcObject) {
         (video.srcObject as MediaStream)
@@ -157,12 +160,15 @@ const Camera: React.FC = () => {
 
           if (nowMs - lastDepthSentRef.current > 1000) {
             lastDepthSentRef.current = nowMs;
-            const depthResult = await sendToDepthAPI(posePayload);
-            if (depthResult) {
-              setPoseData({ keypoints, ...depthResult });
-            } else {
-              setPoseData({ keypoints });
-            }
+            sendToDepthAPI(posePayload).then((depthResult) => {
+              if (isMountedRef.current) {
+                if (depthResult) {
+                  setPoseData({ keypoints, ...depthResult });
+                } else {
+                  setPoseData({ keypoints });
+                }
+              }
+            });
           } else {
             setPoseData({ keypoints });
           }
@@ -215,7 +221,7 @@ const Camera: React.FC = () => {
       </div>
 
       {poseData?.scale_factor && (
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 bg-white/80 text-black px-4 py-2 rounded-md shadow-md text-sm z-30">
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white text-black px-5 py-3 rounded-lg shadow-lg text-base font-medium z-30 backdrop-blur-md">
           Estimated Size: {poseData.scale_factor.toFixed(2)}x | Depth:{" "}
           {poseData.average_depth_cm?.toFixed(1)} cm
         </div>
