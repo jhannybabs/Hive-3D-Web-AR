@@ -249,11 +249,11 @@ const Camera: React.FC = () => {
       )}
 
       {/* Optional debug overlay */}
-      {poseData && (
+      {/* {poseData && (
         <div className="absolute bottom-0 left-0 bg-black/70 text-white text-xs p-2 z-40 max-h-[40vh] overflow-y-auto w-full">
           <pre>{JSON.stringify(poseData, null, 2)}</pre>
         </div>
-      )}
+      )} */}
     </div>
   );
 };
