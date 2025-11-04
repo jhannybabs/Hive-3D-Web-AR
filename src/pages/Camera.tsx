@@ -126,6 +126,9 @@ const Camera: React.FC = () => {
     if (!ctx) return;
 
     let lastTimestamp = -1;
+    let lastValidPose: PoseData | null = null;
+    let lastDetectedTime = Date.now();
+
     const render = async () => {
       if (!isMeasuringRef.current) return;
 
@@ -157,6 +160,7 @@ const Camera: React.FC = () => {
       lastTimestamp = now;
 
       const results = landmarker.detectForVideo(video, now);
+
       if (results.landmarks && results.landmarks.length > 0) {
         const raw = results.landmarks[0];
         const keypoints: Keypoint[] = raw.map((kp, idx) => ({
@@ -171,6 +175,7 @@ const Camera: React.FC = () => {
         if (validKeypoints.length >= MIN_VALID_KEYPOINTS) {
           const posePayload = { keypoints };
           const nowMs = Date.now();
+          lastDetectedTime = nowMs;
 
           if (nowMs - lastDepthSentRef.current > 1000) {
             lastDepthSentRef.current = nowMs;
@@ -183,15 +188,25 @@ const Camera: React.FC = () => {
               if (hasDepth) {
                 const enriched = { keypoints, ...depthResult };
                 setPoseData(enriched);
+                lastValidPose = enriched;
                 lastValidDepthRef.current = enriched;
                 setIsEstimating(false);
               } else {
-                setPoseData(lastValidDepthRef.current ?? { keypoints });
+                setPoseData(
+                  lastValidPose ?? lastValidDepthRef.current ?? { keypoints }
+                );
               }
             });
           } else {
-            setPoseData(lastValidDepthRef.current ?? { keypoints });
+            const enriched = lastValidDepthRef.current ?? { keypoints };
+            setPoseData(enriched);
+            lastValidPose = enriched;
           }
+        }
+      } else {
+        // ❗ No landmarks detected — keep showing last pose for a while
+        if (Date.now() - lastDetectedTime < 1500 && lastValidPose) {
+          setPoseData(lastValidPose);
         }
       }
 
