@@ -11,6 +11,7 @@ type Keypoint = {
   z: number;
   score: number;
 };
+
 type PoseData = {
   keypoints: Keypoint[];
   average_depth_cm?: number;
@@ -25,6 +26,7 @@ const Camera: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const landmarkerRef = useRef<PoseLandmarker | null>(null);
   const isMeasuringRef = useRef<boolean>(true);
+  const lastDepthSentRef = useRef<number>(0);
 
   const [poseData, setPoseData] = useState<PoseData | null>(null);
   const [selectedGarment, setSelectedGarment] =
@@ -109,6 +111,7 @@ const Camera: React.FC = () => {
     let lastTimestamp = -1;
     const render = async () => {
       if (!isMeasuringRef.current) return;
+
       if (
         video.readyState < 2 ||
         video.videoWidth === 0 ||
@@ -150,14 +153,22 @@ const Camera: React.FC = () => {
         const validKeypoints = keypoints.filter((kp) => kp.score >= 0.5);
         if (validKeypoints.length >= MIN_VALID_KEYPOINTS) {
           const posePayload = { keypoints };
-          const depthResult = await sendToDepthAPI(posePayload);
-          if (depthResult) {
-            setPoseData({ keypoints, ...depthResult });
+          const nowMs = Date.now();
+
+          if (nowMs - lastDepthSentRef.current > 1000) {
+            lastDepthSentRef.current = nowMs;
+            const depthResult = await sendToDepthAPI(posePayload);
+            if (depthResult) {
+              setPoseData({ keypoints, ...depthResult });
+            } else {
+              setPoseData({ keypoints });
+            }
           } else {
             setPoseData({ keypoints });
           }
         }
       }
+
       if (isMeasuringRef.current) requestAnimationFrame(render);
     };
     render();
@@ -203,9 +214,8 @@ const Camera: React.FC = () => {
         <ARScene pose={poseData} selectedGarment={selectedGarment} />
       </div>
 
-      {/* 📏 Small div to show user size */}
       {poseData?.scale_factor && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/80 text-black px-4 py-2 rounded-md shadow-md text-sm z-30">
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 bg-white/80 text-black px-4 py-2 rounded-md shadow-md text-sm z-30">
           Estimated Size: {poseData.scale_factor.toFixed(2)}x | Depth:{" "}
           {poseData.average_depth_cm?.toFixed(1)} cm
         </div>
