@@ -43,7 +43,6 @@ const Camera: React.FC = () => {
   const [poseData, setPoseData] = useState<PoseData | null>(null);
   const [selectedGarment, setSelectedGarment] =
     useState<string>("busy_bees_cream");
-  const [videoReady, setVideoReady] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true); // ✅ toggle state
 
   const sendToDepthAPI = async (pose: PoseData) => {
@@ -95,7 +94,6 @@ const Camera: React.FC = () => {
 
         video.onloadedmetadata = () => {
           video.play().then(() => {
-            setVideoReady(true);
             detectPose();
           });
         };
