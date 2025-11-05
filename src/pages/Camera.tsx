@@ -21,12 +21,24 @@ type PoseData = {
   reference?: string;
 };
 
+// 🔧 Map scale factor to shirt sizes
+function mapScaleToSize(scaleFactor: number) {
+  if (scaleFactor < 0.9) return 'S (21.5" x 29")';
+  if (scaleFactor < 1.0) return 'M (22.5" x 30")';
+  if (scaleFactor < 1.1) return 'L (23.5" x 31")';
+  if (scaleFactor < 1.2) return 'XL (24.5" x 32")';
+  if (scaleFactor < 1.3) return '2XL (25.5" x 33")';
+  return '3XL (26.5" x 34")';
+}
+
 const Camera: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const landmarkerRef = useRef<PoseLandmarker | null>(null);
   const isMeasuringRef = useRef<boolean>(true);
   const lastDepthSentRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(true);
+  const lastValidDepthRef = useRef<PoseData | null>(null);
 
   const [poseData, setPoseData] = useState<PoseData | null>(null);
   const [selectedGarment, setSelectedGarment] =
@@ -35,11 +47,14 @@ const Camera: React.FC = () => {
 
   const sendToDepthAPI = async (pose: PoseData) => {
     try {
-      const res = await fetch("https://8k973b0d-2702.asse.devtunnels.ms/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pose),
-      });
+      const res = await fetch(
+        "https://8k973b0d-2702.asse.devtunnels.ms/depth",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pose),
+        }
+      );
       return await res.json();
     } catch (err) {
       console.error("Depth API error:", err);
@@ -48,6 +63,7 @@ const Camera: React.FC = () => {
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     const setup = async () => {
       try {
         const vision = await FilesetResolver.forVisionTasks(
@@ -90,6 +106,7 @@ const Camera: React.FC = () => {
 
     setup();
     return () => {
+      isMountedRef.current = false;
       const video = videoRef.current;
       if (video?.srcObject) {
         (video.srcObject as MediaStream)
@@ -157,15 +174,59 @@ const Camera: React.FC = () => {
 
           if (nowMs - lastDepthSentRef.current > 1000) {
             lastDepthSentRef.current = nowMs;
-            const depthResult = await sendToDepthAPI(posePayload);
-            if (depthResult) {
-              setPoseData({ keypoints, ...depthResult });
+            sendToDepthAPI(posePayload).then((depthResult) => {
+              if (isMountedRef.current) {
+                if (
+                  depthResult &&
+                  typeof depthResult.scale_factor === "number"
+                ) {
+                  // ✅ Keep keypoints and add depth data
+                  const enriched = { keypoints, ...depthResult };
+                  lastValidDepthRef.current = enriched;
+                  setPoseData(enriched);
+                } else {
+                  // ✅ If no depth data, still update with current keypoints
+                  if (lastValidDepthRef.current) {
+                    // Merge current keypoints with last valid depth data
+                    setPoseData({
+                      ...lastValidDepthRef.current,
+                      keypoints, // Use current frame's keypoints
+                    });
+                  } else {
+                    setPoseData({ keypoints });
+                  }
+                }
+              }
+            });
+          } else {
+            // ✅ Always update keypoints even when not calling depth API
+            if (lastValidDepthRef.current) {
+              // Merge current keypoints with last valid depth data
+              setPoseData({
+                ...lastValidDepthRef.current,
+                keypoints, // Use current frame's keypoints
+              });
             } else {
               setPoseData({ keypoints });
             }
-          } else {
-            setPoseData({ keypoints });
           }
+        } else {
+          // ✅ Not enough valid keypoints, but still update if we have valid depth
+          if (
+            lastValidDepthRef.current &&
+            lastValidDepthRef.current.keypoints.length >= MIN_VALID_KEYPOINTS
+          ) {
+            // Keep showing the last valid pose data
+            setPoseData(lastValidDepthRef.current);
+          }
+        }
+      } else {
+        // ✅ No landmarks detected, but still keep showing last valid data
+        if (
+          lastValidDepthRef.current &&
+          lastValidDepthRef.current.keypoints.length >= MIN_VALID_KEYPOINTS
+        ) {
+          setPoseData(lastValidDepthRef.current);
         }
       }
 
@@ -210,13 +271,21 @@ const Camera: React.FC = () => {
         </div>
       )}
 
-      <div className="absolute inset-0 z-10 pointer-events-none">
-        <ARScene pose={poseData} selectedGarment={selectedGarment} />
-      </div>
+      {/* ✅ AR Scene always renders when we have pose data */}
+      {poseData && poseData.keypoints.length > 0 && (
+        <div className="absolute inset-0 z-10 pointer-events-none">
+          <ARScene pose={poseData} selectedGarment={selectedGarment} />
+        </div>
+      )}
 
+      {/* ✅ Sizing overlay - shows independently of AR scene */}
       {poseData?.scale_factor && (
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 bg-white/80 text-black px-4 py-2 rounded-md shadow-md text-sm z-30">
-          Estimated Size: {poseData.scale_factor.toFixed(2)}x | Depth:{" "}
+        <div
+          className="absolute bottom-6 left-1/2 transform -translate-x-1/2 
+                     bg-white text-black px-5 py-3 rounded-lg shadow-lg 
+                     text-base font-medium z-30 backdrop-blur-md"
+        >
+          Estimated Size: {mapScaleToSize(poseData.scale_factor)} | Depth:{" "}
           {poseData.average_depth_cm?.toFixed(1)} cm
         </div>
       )}
