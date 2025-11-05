@@ -45,6 +45,22 @@ const Camera: React.FC = () => {
     useState<string>("busy_bees_cream");
   const [videoReady, setVideoReady] = useState(false);
 
+  // ✅ State for delayed size overlay
+  const [showSize, setShowSize] = useState(false);
+
+  // ✅ Effect: start 20s timer when scale_factor appears
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (poseData?.scale_factor) {
+      if (!showSize) {
+        timer = setTimeout(() => setShowSize(true), 20000); // 20s
+      }
+    } else {
+      setShowSize(false);
+    }
+    return () => clearTimeout(timer);
+  }, [poseData?.scale_factor]);
+
   const sendToDepthAPI = async (pose: PoseData) => {
     try {
       const res = await fetch(
@@ -180,17 +196,14 @@ const Camera: React.FC = () => {
                   depthResult &&
                   typeof depthResult.scale_factor === "number"
                 ) {
-                  // ✅ Keep keypoints and add depth data
                   const enriched = { keypoints, ...depthResult };
                   lastValidDepthRef.current = enriched;
                   setPoseData(enriched);
                 } else {
-                  // ✅ If no depth data, still update with current keypoints
                   if (lastValidDepthRef.current) {
-                    // Merge current keypoints with last valid depth data
                     setPoseData({
                       ...lastValidDepthRef.current,
-                      keypoints, // Use current frame's keypoints
+                      keypoints,
                     });
                   } else {
                     setPoseData({ keypoints });
@@ -199,25 +212,21 @@ const Camera: React.FC = () => {
               }
             });
           } else {
-            // ✅ Always update keypoints even when not calling depth API
             if (lastValidDepthRef.current) {
-              // Merge current keypoints with last valid depth data
               setPoseData({
                 ...lastValidDepthRef.current,
-                keypoints, // Use current frame's keypoints
+                keypoints,
               });
             } else {
               setPoseData({ keypoints });
             }
           }
         } else {
-          // ✅ Keep updating even with insufficient keypoints
-          // This prevents the AR scene from disappearing
           if (keypoints.length > 0) {
             if (lastValidDepthRef.current) {
               setPoseData({
                 ...lastValidDepthRef.current,
-                keypoints, // Use whatever keypoints we have
+                keypoints,
               });
             } else {
               setPoseData({ keypoints });
@@ -226,12 +235,10 @@ const Camera: React.FC = () => {
             lastValidDepthRef.current &&
             lastValidDepthRef.current.keypoints.length >= MIN_VALID_KEYPOINTS
           ) {
-            // Keep showing the last valid pose data
             setPoseData(lastValidDepthRef.current);
           }
         }
       } else {
-        // ✅ No landmarks detected, but still keep showing last valid data
         if (
           lastValidDepthRef.current &&
           lastValidDepthRef.current.keypoints.length >= MIN_VALID_KEYPOINTS
@@ -281,7 +288,7 @@ const Camera: React.FC = () => {
         </div>
       )}
 
-      {/* ✅ AR Scene always renders - moved outside conditional */}
+      {/* ✅ AR Scene always renders */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         <ARScene
           pose={poseData ?? { keypoints: [] }}
@@ -289,8 +296,8 @@ const Camera: React.FC = () => {
         />
       </div>
 
-      {/* ✅ Sizing overlay - shows independently of AR scene */}
-      {poseData?.scale_factor && (
+      {/* ✅ Sizing overlay - appears only after 20s delay */}
+      {showSize && poseData?.scale_factor && (
         <div
           className="absolute bottom-6 left-1/2 transform -translate-x-1/2 
                      bg-white text-black px-5 py-3 rounded-lg shadow-lg 
