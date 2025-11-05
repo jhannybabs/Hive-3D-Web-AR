@@ -211,8 +211,18 @@ const Camera: React.FC = () => {
             }
           }
         } else {
-          // ✅ Not enough valid keypoints, but still update if we have valid depth
-          if (
+          // ✅ Keep updating even with insufficient keypoints
+          // This prevents the AR scene from disappearing
+          if (keypoints.length > 0) {
+            if (lastValidDepthRef.current) {
+              setPoseData({
+                ...lastValidDepthRef.current,
+                keypoints, // Use whatever keypoints we have
+              });
+            } else {
+              setPoseData({ keypoints });
+            }
+          } else if (
             lastValidDepthRef.current &&
             lastValidDepthRef.current.keypoints.length >= MIN_VALID_KEYPOINTS
           ) {
@@ -271,12 +281,13 @@ const Camera: React.FC = () => {
         </div>
       )}
 
-      {/* ✅ AR Scene always renders when we have pose data */}
-      {poseData && poseData.keypoints.length > 0 && (
-        <div className="absolute inset-0 z-10 pointer-events-none">
-          <ARScene pose={poseData} selectedGarment={selectedGarment} />
-        </div>
-      )}
+      {/* ✅ AR Scene always renders - moved outside conditional */}
+      <div className="absolute inset-0 z-10 pointer-events-none">
+        <ARScene
+          pose={poseData ?? { keypoints: [] }}
+          selectedGarment={selectedGarment}
+        />
+      </div>
 
       {/* ✅ Sizing overlay - shows independently of AR scene */}
       {poseData?.scale_factor && (
