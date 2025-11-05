@@ -43,7 +43,7 @@ const Camera: React.FC = () => {
   const [poseData, setPoseData] = useState<PoseData | null>(null);
   const [selectedGarment, setSelectedGarment] =
     useState<string>("busy_bees_cream");
-  const [showOverlay, setShowOverlay] = useState(true); // ✅ toggle state
+  const [videoReady, setVideoReady] = useState(false);
 
   const sendToDepthAPI = async (pose: PoseData) => {
     try {
@@ -94,6 +94,7 @@ const Camera: React.FC = () => {
 
         video.onloadedmetadata = () => {
           video.play().then(() => {
+            setVideoReady(true);
             detectPose();
           });
         };
@@ -179,14 +180,17 @@ const Camera: React.FC = () => {
                   depthResult &&
                   typeof depthResult.scale_factor === "number"
                 ) {
+                  // ✅ Keep keypoints and add depth data
                   const enriched = { keypoints, ...depthResult };
                   lastValidDepthRef.current = enriched;
                   setPoseData(enriched);
                 } else {
+                  // ✅ If no depth data, still update with current keypoints
                   if (lastValidDepthRef.current) {
+                    // Merge current keypoints with last valid depth data
                     setPoseData({
                       ...lastValidDepthRef.current,
-                      keypoints,
+                      keypoints, // Use current frame's keypoints
                     });
                   } else {
                     setPoseData({ keypoints });
@@ -195,21 +199,25 @@ const Camera: React.FC = () => {
               }
             });
           } else {
+            // ✅ Always update keypoints even when not calling depth API
             if (lastValidDepthRef.current) {
+              // Merge current keypoints with last valid depth data
               setPoseData({
                 ...lastValidDepthRef.current,
-                keypoints,
+                keypoints, // Use current frame's keypoints
               });
             } else {
               setPoseData({ keypoints });
             }
           }
         } else {
+          // ✅ Keep updating even with insufficient keypoints
+          // This prevents the AR scene from disappearing
           if (keypoints.length > 0) {
             if (lastValidDepthRef.current) {
               setPoseData({
                 ...lastValidDepthRef.current,
-                keypoints,
+                keypoints, // Use whatever keypoints we have
               });
             } else {
               setPoseData({ keypoints });
@@ -218,10 +226,12 @@ const Camera: React.FC = () => {
             lastValidDepthRef.current &&
             lastValidDepthRef.current.keypoints.length >= MIN_VALID_KEYPOINTS
           ) {
+            // Keep showing the last valid pose data
             setPoseData(lastValidDepthRef.current);
           }
         }
       } else {
+        // ✅ No landmarks detected, but still keep showing last valid data
         if (
           lastValidDepthRef.current &&
           lastValidDepthRef.current.keypoints.length >= MIN_VALID_KEYPOINTS
@@ -262,15 +272,16 @@ const Camera: React.FC = () => {
         ))}
       </select>
 
-      {/* ✅ Toggle button for overlay */}
-      <button
-        onClick={() => setShowOverlay(!showOverlay)}
-        className="absolute top-20 left-4 z-20 bg-white/90 px-3 py-2 rounded shadow text-sm font-medium"
-      >
-        {showOverlay ? "Hide Size Overlay" : "Show Size Overlay"}
-      </button>
+      {!videoReady && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-30">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-yellow-400 border-t-transparent mb-4 mx-auto"></div>
+            <p className="text-white text-lg">Loading camera...</p>
+          </div>
+        </div>
+      )}
 
-      {/* ✅ AR Scene always renders */}
+      {/* ✅ AR Scene always renders - moved outside conditional */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         <ARScene
           pose={poseData ?? { keypoints: [] }}
@@ -278,8 +289,8 @@ const Camera: React.FC = () => {
         />
       </div>
 
-      {/* ✅ Sizing overlay - controlled by toggle */}
-      {showOverlay && poseData?.scale_factor && (
+      {/* ✅ Sizing overlay - shows independently of AR scene */}
+      {poseData?.scale_factor && (
         <div
           className="absolute bottom-6 left-1/2 transform -translate-x-1/2 
                      bg-white text-black px-5 py-3 rounded-lg shadow-lg 
