@@ -14,7 +14,6 @@ export const filterValidKeypoints = (
   threshold?: number
 ): Keypoint[] => {
   const isMobile = window.innerWidth <= 768;
-  // Lower threshold on mobile for better detection
   const adaptiveThreshold = threshold ?? (isMobile ? 0.4 : MIN_CONFIDENCE);
 
   return keypoints.filter((kp) => kp.score >= adaptiveThreshold);

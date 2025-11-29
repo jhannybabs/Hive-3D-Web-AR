@@ -1,4 +1,3 @@
-// src/components/RenderModel.tsx
 import { useRef, useEffect } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -14,7 +13,6 @@ type Props = {
   scale: number;
   backFacing?: boolean;
   screenSize?: { width: number; height: number };
-  // 🔗 New optional offset from backend
   offset?: { x: number; y: number };
 };
 
@@ -23,7 +21,7 @@ export default function RenderModel({
   attachTo,
   scale,
   backFacing,
-  offset, // ✅ accept offset
+  offset,
 }: Props) {
   const { scene } = useGLTF(modelPath);
   const groupRef = useRef<THREE.Group>(null);
@@ -71,7 +69,6 @@ export default function RenderModel({
     const targetPos = camPos.clone().add(dir.multiplyScalar(depth));
     targetPos.x *= -1;
 
-    // ✅ Apply backend offset if provided
     if (offset) {
       targetPos.x += offset.x;
       targetPos.y += offset.y;

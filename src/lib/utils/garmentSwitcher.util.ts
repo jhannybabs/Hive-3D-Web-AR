@@ -1,4 +1,3 @@
-// src/lib/utils/garmentSwitcher.util.ts
 export const GARMENT_MODELS: Record<string, string> = {
   busy_bees_cream: "/3DModels/Busy_Bees_Cream.glb",
   busy_bees_white: "/3DModels/Busy_Bees_White.glb",

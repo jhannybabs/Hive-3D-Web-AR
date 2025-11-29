@@ -1,4 +1,3 @@
-// src/components/ARScene.tsx
 import { useMemo, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
@@ -75,7 +74,6 @@ export default function ARScene({ pose, selectedGarment }: Props) {
     1.5
   );
 
-  // ✅ Use backend scale if available, else fallback
   const scale = pose?.scale_factor ?? fallbackScale;
 
   const fov = isSmallMobile ? 65 : isMobile ? 60 : 55;
@@ -110,7 +108,6 @@ export default function ARScene({ pose, selectedGarment }: Props) {
         modelPath={modelPath}
         attachTo={chest}
         scale={scale}
-        // ✅ Pass backend offsets if available
         offset={{
           x: pose?.center_x_m ?? 0,
           y: pose?.center_y_m ?? 0,
